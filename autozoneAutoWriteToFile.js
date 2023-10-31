@@ -1,0 +1,133 @@
+const fs = require('fs');
+const path = require("path");
+
+/**
+ * This functions issues a get request to the Autozone vehicles API to get information about the years, makes, and models that it covers.
+ */
+async function writeMakes() {
+
+    const SOURCEPATH = process.env.AUTOZONEPATH + '/years/';
+
+    //Spoof requests as coming from Postman, fill in your own header values
+    let headers = new Headers({
+        "Cookie": "_abck=6BCD5E5C18A0D5C08F1B31CA87AC2C3F~-1~YAAQO6osF1KdtImKAQAADrVOvgqMlBiuGVMuMcWgHRzGSlWdsRkFqH/mCTyXWjkySsjh18U4IG/+hOKui+NvHPfbASX7KOqOjpdDvLsBgwvo/TyF3ZCWDQs5qQAdlcmgilhCNxa31otRezVQI24Y2D5aP0A6HsCI0Vqk/N/wZH/ZtgzDgmwtJDfvmNgDJDgQhR8dCNqW6VA2h19EZ1Vh9xD1Q+SVDt5sgbBF9aEJ2FYnpvnUFvdFEIQS1rgj77DR3xmIj/mE/J94APSv3pRa4trrlgap2i0bBV5ERWdKRilAniQENtMl7xpzAcf5bZZIEsIkTrah4Gw/xz/qp0XW2+O43jvWNcvQMOKYUflqMrRbOp8rWX4qSWRSG7orcnt/MW52NPciNKEZ~-1~-1~-1; az_bt_cl=O7YKfuQQY4hSU7097liPTNIt0d4vWNXEgiXdPtyvekQb79nTZREjuybbr4NPF+lp; bm_sz=ADD5BEE5C5C97EFD6E0F2277E9849AA0~YAAQO6osF1OdtImKAQAADrVOvhVEcISPvUxhTTOdBNXT5FMqqSkk/x6GOZPORUo0dUSmy2S9ysk/mm5Aq4jEsuiG8305d0Rxbtx/2EHvV4iyXOZ+Z1GzQSHa05b1oH6VjLFfTIavvHyJafJkjdQ2kzfFDMu/if46AqNArkPemv3z7TUdN0GEpTZnTsh42AbsWXTL8b+l+r4promHv+l3oZ8pEiWVIZ2t4afrBH15pnyDBEtU/KD+zvUfYaJxtkMkqlZRbPfh9FzqCYB2b01ztM1VQtMsqV9nHc1zN8nMnw0adkAngA==~3617858~3487541",
+        "User-Agent": "PostmanRuntime/7.33.0",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+    });
+
+    /**
+     * Helper workaround method to have the main method "sleep" to prevent being throttled by the API.
+     * @param {int} delay - How many milliseconds to sleep.
+     * @returns A promise based on a timeout.
+     */
+    const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay))
+    const start = Date.now();
+
+    //They don't have a URL that returns years, so manually create an array of year strings.
+    let yearsArr = [];
+    for (let i = 2014; i <= 2024; i++) {
+        yearsArr.push(i);
+    }
+
+    //Get Years
+    for (let year of yearsArr) {
+        let yearStart = Date.now()
+        console.log(`Starting year: ${year} at ${yearStart - start} ms`);
+
+        //https://www.autozone.com/ecomm/b2c/v1/ymme/makes/2024
+        let getMakesURL = "https://www.autozone.com/ecomm/b2c/v1/ymme/makes/"+ year;
+        let makesResponse = await fetch(getMakesURL, { headers: headers });
+        let makesArr = await makesResponse.json();
+        console.log(makesArr);
+
+        //Get Makes
+        for (let makeObj of makesArr) {
+
+            //Use this to focus on one make
+            /* if (makeObj.make != 'Hyundai') {
+                continue;
+            } */
+
+            //Get values from object
+            let make = makeObj.make;
+            let makeId = makeObj.makeId;
+            make = make.replaceAll(/\//g, '-');
+            let makeContentFileName = `request-${(year)}-${(make)}.json`;
+
+            //Create Folder
+            let folderName = SOURCEPATH + year + '/' + make + '/';
+            if (!fs.existsSync(folderName)) {
+                fs.mkdir(folderName, { recursive: true }, err => { console.error(err) })
+            }
+
+            //Create Make File
+            if (!fs.existsSync(folderName + makeContentFileName)) {
+
+                //Write to file
+                fs.writeFile(folderName + makeContentFileName, JSON.stringify(makeObj), function (error) {
+                    if (error) {
+                        //console.error(error);
+                    }
+                })
+            }
+
+            let makeStart = Date.now()
+            make = make.replaceAll('/', '-')
+            console.log(`Starting make: ${make} at ${makeStart - start} ms`);
+            //https://www.autozone.com/ecomm/b2c/v1/ymme/models/2024/Acura/9024099
+            let getModelsURL = "https://www.autozone.com/ecomm/b2c/v1/ymme/models/" + year + "/" + make + "/" + makeId;
+            let modelsResponse = await fetch(getModelsURL, { headers: headers });
+            let modelsArr = await modelsResponse.json();
+            console.log(modelsArr);
+            for (let modelObj of modelsArr) {
+                await modelObj.model.replace(/\//g, 'ForwardSlash');
+            }
+
+
+            //Get Models
+            //https://www.autozone.com/ecomm/b2c/v1/ymme/engines/9888700
+            for (let modelObj of modelsArr) {
+                let model = modelObj.model;
+                model = model.replaceAll(':',"-").replaceAll(',','-');
+                let modelId = modelObj.modelId;
+                model = model.replaceAll('/', '-')
+                let getEnginesURL = "https://www.autozone.com/ecomm/b2c/v1/ymme/engines/" + modelId;
+                //let getEnginesURL = "https://shop.advanceautoparts.com/capi/v30/vehicles?type=3&year=" + year + "&make=" + encodeURIComponent(make) + "&model=" + encodeURIComponent(model);
+
+                //Setup json file
+                let modelContentFileName = `request-${(year)}-${(make)}-${(model)}.json`;
+
+
+                
+
+                //Create Model File
+                //if (!fs.existsSync(folderName + modelContentFileName)) {
+                    await sleep(300);
+                    let EnginesResponse = await fetch(getEnginesURL, { headers: headers });
+                    let EnginesArr = await EnginesResponse.json();
+                    //let content = EnginesArr[0];
+                    let engineJSON = { request: getEnginesURL, "info": EnginesArr }
+
+
+                    //Write to file
+                    fs.writeFile(folderName + modelContentFileName, JSON.stringify(engineJSON), function (error) {
+                        if (error) {
+                            //console.error(error);
+                        }
+                    })
+                //}
+            }
+
+            let makeEnd = Date.now()
+            console.log(`Ending make: ${make} at ${makeEnd - start} ms`);
+        }
+
+        let yearEnd = Date.now()
+        console.log(`Ending year: ${year} at ${yearEnd - start} ms`);
+    }
+
+}
+
+writeMakes();

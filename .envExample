@@ -1,0 +1,8 @@
+#This is just the structure and env variable names that the program expects. Fill in your own values, then rename this file to just ".env"
+
+AWS_ACCESS_KEY_ID = "<Use your own Access Key>"
+AWS_SECRET_ACCESS_KEY = "<Use your own Secret Key>"
+REGION = "<Use your own Region>"
+ADVANCEPATH = "C:\Users\<USER>\<Rest of your path>\car-parts\advance"
+AUTOZONEPATH = "C:\Users\<USER>\<Rest of your path>\car-parts\autozone"
+PEPBOYSPATH = "C:\Users\<USER>\<Rest of your path>\car-parts\pepboys"
